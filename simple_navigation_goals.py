@@ -50,15 +50,38 @@ class TurtleBot:
 
         # recuperation des informations de l'utilisateur
         goal_pose2D.x = input("Rentrez la position en x :")
-        goal_pose2D.y = input("Rentrez la position en y:")
-        goal_pose2D.theta = input("Rentrez l'angle")
+        goal_pose2D.y = input("Rentrez la position en y :")
+        goal_pose2D.theta = input("Rentrez l'angle :")
 
         # Definition tolerance --> gestion de l'espace proche
-        distance_tolerance = input("Definition de la tolerance :")
+        distance_tolerance = 0.1
 
         speed_msg = Twist()
 
+        print(
+            "Position du robot: x {}, y {}, theta {}".format(
+                self.pose2D.x, self.pose2D.y, self.pose2D.theta
+            )
+        )
+
+        print("Lancement...")
+
         while self.distance(goal_pose2D) >= distance_tolerance:
+
+            print("En cours")
+
+            # Affiche les positions :
+            #
+            print(
+                "Position du robot en x : {}, y : {} theta: {}\n".format(
+                    self.pose2D.x, self.pose2D.y, self.pose2D.theta
+                )
+            )
+            print(
+                "Position souhaitee : x {}, y {}, theta {}".format(
+                    goal_pose2D.x, goal_pose2D.y, goal_pose2D.theta
+                )
+            )
 
             # Proportionnel controle
 
@@ -77,6 +100,8 @@ class TurtleBot:
 
             # Edition attente
             self.rate.sleep()
+
+            rospy.spin()
 
         # Arret du robot une fois que le point est atteint
         speed_msg.linear.x = 0
