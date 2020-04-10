@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 import rospy
 from math import pow, atan2, sqrt
-from geometry_msgs.msg import Twist, Pose2D
+from geometry_msgs.msg import Twist, PoseWithCovarianceStamped, Quaternion
 
 
 class TurtleBot:
@@ -13,45 +13,66 @@ class TurtleBot:
         self.velocity_publisher = rospy.Publisher("cmd_vel", Twist, queue_size=10)
 
         # Uing publisher to edit pose2D
-        self.pose2D_subscriver = rospy.Subscriber(
-            "/turtlebot3/pose2D", Pose2D, self.update_pose2D
+        self.pose_subscriver = rospy.Subscriber(
+            "/turtlebot3/pose", PoseWithCovarianceStamped, self.update_pose,
         )
 
-        self.pose2D = Pose2D()
+        self.pose = PoseWithCovarianceStamped()
         self.rate = rospy.Rate(10)
 
-    def update_pose2D(self, data):
-        self.pose2D = data
-        self.pose2D.x = round(self.pose2D.x, 4)
-        self.pose2D.y = round(self.pose2D.y, 4)
+    def update_pose(self, data):
+        self.pose = data
+        self.pose.pose.point.x = round(self.pose.pose.point.x, 4)
+        self.pose.pose.point.y = round(self.pose.pose.point.y, 4)
+        self.pose.pose.quaternion.x = round(self.pose.pose.quaternion.x, 4)
+        self.pose.pose.quaternion.y = round(self.pose.pose.quaternion.y, 4)
+        self.pose.pose.quaternion.z = round(self.pose.pose.quaternion.z, 4)
+        self.pose.pose.quaternion.w = round(self.pose.pose.quaternion.w, 4)
 
-    def distance(self, goal_pose2D):
+    def distance(self, goal_pose):
         # distance entre la position actuelle et le goal
         return sqrt(
-            pow((goal_pose2D.x - self.pose2D.x), 2)
-            + pow((goal_pose2D.y - self.pose2D.y), 2)
+            pow((goal_pose.pose.pose.point.x - self.pose.pose.point.x), 2)
+            + pow((goal_pose.pose.pose.point.y - self.pose.pose.point.y), 2)
         )
 
-    def line_speed(self, goal_pose2D, constant=0.1):
+    def line_speed(self, goal_pose, constant=0.1):
         # Definition de la vitesse lineaire
-        return constant * self.distance(goal_pose2D)
+        return constant * self.distance(goal_pose)
 
-    def steering_angle(self, goal_pose2D):
+    def steering_angle(self, goal_pose):
         # Definition angle rotation
-        return atan2(goal_pose2D.y - self.pose2D.y, goal_pose2D.x - self.pose2D.x)
+        return atan2(
+            goal_pose.pose.pose.point.y - self.pose.pose.point.y,
+            goal_pose.pose.pose.point.x - self.pose.pose.point.x,
+        )
 
-    def angular_speed(self, goal_pose2D, constant=0.2):
+    # def quaternion_to_euler(self):
+    #     x = self.pose.pose.pose.quaternion.x
+    #     y = self.pose.pose.pose.quaternion.y
+    #     z = self.pose.pose.pose.quaternion.z
+    #     w = self.pose.pose.pose.quaternion.w
+    #     q = Quaternion(x, y, z, w)
+    #     print("quaternion = {}\n".format(q))
+    #     return q
+
+    def angular_speed(self, goal_pose, constant=0.2):
         # Definie le calcul de la vitesse angulaire
-        return constant * (self.steering_angle(goal_pose2D) - self.pose2D.theta)
+        # theta = quaternion_to_euler()
+        theta = 1
+        return constant * (self.steering_angle(goal_pose) - theta)
 
     def goto(self):
+
+        # theta = self.quaternion_to_euler()
+        theta = 1
         # Deplace le robot jusqu'au point voulu
-        goal_pose2D = Pose2D()
+        goal_pose = PoseWithCovarianceStamped()
 
         # recuperation des informations de l'utilisateur
-        goal_pose2D.x = input("Rentrez la position en x :")
-        goal_pose2D.y = input("Rentrez la position en y :")
-        goal_pose2D.theta = input("Rentrez l'angle :")
+        goal_pose.pose.point.x = input("Rentrez la position en x :")
+        goal_pose.y = input("Rentrez la position en y :")
+        goal_pose.theta = input("Rentrez l'angle :")
 
         # Definition tolerance --> gestion de l'espace proche
         distance_tolerance = 0.1
@@ -60,13 +81,13 @@ class TurtleBot:
 
         print(
             "Position du robot: x {}, y {}, theta {}".format(
-                self.pose2D.x, self.pose2D.y, self.pose2D.theta
+                self.pose.pose.pose.point.x, self.pose.pose.pose.point.y, theta,
             )
         )
 
         print("Lancement...")
 
-        while self.distance(goal_pose2D) >= distance_tolerance:
+        while self.distance(goal_pose) >= distance_tolerance:
 
             print("En cours")
 
@@ -74,34 +95,32 @@ class TurtleBot:
             #
             print(
                 "Position du robot en x : {}, y : {} theta: {}\n".format(
-                    self.pose2D.x, self.pose2D.y, self.pose2D.theta
+                    self.pose.pose.pose.point.x, self.pose.pose.pose.point.y, theta,
                 )
             )
             print(
-                "Position souhaitee : x {}, y {}, theta {}".format(
-                    goal_pose2D.x, goal_pose2D.y, goal_pose2D.theta
+                "Position souhaitee : x {}, y {}, theta {}\n".format(
+                    goal_pose.x, goal_pose.y, goal_pose.theta,
                 )
             )
 
             # Proportionnel controle
 
             # Vitesse linaire en x
-            speed_msg.linear.x = self.line_speed(goal_pose2D)
+            speed_msg.linear.x = self.line_speed(goal_pose)
             speed_msg.linear.y = 0
             speed_msg.linear.z = 0
 
             # Vitesse angulaire en z
             speed_msg.angular.x = 0
             speed_msg.angular.y = 0
-            speed_msg.angular.z = self.angular_speed(goal_pose2D)
+            speed_msg.angular.z = self.angular_speed(goal_pose)
 
             # Edition notre vitesse
             self.velocity_publisher.publish(speed_msg)
 
             # Edition attente
             self.rate.sleep()
-
-            rospy.spin()
 
         # Arret du robot une fois que le point est atteint
         speed_msg.linear.x = 0
@@ -114,8 +133,9 @@ class TurtleBot:
 
 if __name__ == "__main__":
     try:
-        x = TurtleBot()
-        x.goto()
+        while not rospy.is_shutdown():
+            x = TurtleBot()
+            x.goto()
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
